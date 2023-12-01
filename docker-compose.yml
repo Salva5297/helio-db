@@ -1,0 +1,86 @@
+version: '2'
+services:
+  helio-rest:
+    image: acimmino/helio-rest:latest
+    volumes: 
+      - type: volume
+        source: helio-db
+        target: /helio/app
+        volume: {}
+      - ./config/default-components.json:/app/default-components.json
+      - ./config/rest-db.mv.db:/app/rest-db.mv.db
+      - ./config/helio-sources:/app/components
+    ports:
+      - "4568:4567"
+    restart: unless-stopped
+    networks:
+      - some-net
+
+  frontend:
+    image: emiliocrespoperan/helio-frontend:latest
+    depends_on:
+      - helio-rest
+    ports:
+      - "5600:80"
+    restart: unless-stopped
+    environment:
+      - HELIO_REST_HOST=https://data.cogito.iot.linkeddata.es/validation
+    networks:
+      - some-net
+
+  graphdb:
+    image: khaller/graphdb-free:10.0.0
+    environment:
+      GDB_JAVA_OPTS: >-
+        -Dgraphdb.home=/opt/graphdb/home
+    volumes:
+      - ./config/config.ttl:/opt/graphdb/home/data/repositories/cogito-triplestore/config.ttl
+      - ./config/graphdb-data:/opt/graphdb/home
+    ports:
+      - '7200:7200'
+    restart: unless-stopped
+    networks:
+      - some-net
+
+  triplestore:
+    image: acimmino/auroral-fuseky:latest
+    environment:
+      ADMIN_PASSWORD: pw123
+    volumes:
+    - ./config/wot-hive_triplestore:/fuseki/databases
+    - triplestore:/fuseki
+    ports:
+      - '3030:3030'
+    restart: unless-stopped
+    networks:
+      - some-net
+
+  wothive:
+    image: acimmino/wot-hive:latest
+    ports:
+      - '9000:9000'
+    restart: unless-stopped
+    networks:
+      - some-net
+  
+  thing_manager:
+    image: salva5297/thing_manager:0.1.3
+    environment:
+      - FLASK_ENV=development
+    env_file: ./config/variables.env
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - some-net
+
+
+networks:
+  some-net:
+    driver: bridge
+
+volumes:
+  helio-db:
+    name: helio-db
+  triplestore:
+    name: triplestore
